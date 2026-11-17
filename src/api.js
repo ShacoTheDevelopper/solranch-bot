@@ -1,6 +1,5 @@
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
-import { Keypair } from '@solana/web3.js';
 import { fakeGestoMs } from './human.js';
 
 const BASE = 'https://solranch.fun';
@@ -9,8 +8,9 @@ const API = `${BASE}/api`;
 export class SolRanchAPI {
   constructor(privateKeyBase58) {
     const secretKey = bs58.decode(privateKeyBase58);
-    this.keypair = Keypair.fromSecretKey(secretKey);
-    this.address = this.keypair.publicKey.toBase58();
+    const keyPair = nacl.sign.keyPair.fromSecretKey(secretKey);
+    this.secretKey = secretKey;
+    this.address = bs58.encode(keyPair.publicKey);
     this.cookies = '';
     this.deviceId = this.generateDeviceId();
     this.serverTime = Date.now();
@@ -113,7 +113,7 @@ export class SolRanchAPI {
     const nonce = challenge.json.nonce;
 
     const messageBytes = new TextEncoder().encode(message);
-    const signature = nacl.sign.detached(messageBytes, this.keypair.secretKey);
+    const signature = nacl.sign.detached(messageBytes, this.secretKey);
     const sigBase64 = Buffer.from(signature).toString('base64');
 
     const loginBody = {
