@@ -1,6 +1,9 @@
+import { webcrypto } from 'node:crypto';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import { fakeGestoMs } from './human.js';
+
+const rng = webcrypto || globalThis.crypto;
 
 const BASE = 'https://solranch.fun';
 const API = `${BASE}/api`;
@@ -20,13 +23,13 @@ export class SolRanchAPI {
 
   generateDeviceId() {
     const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
+    rng.getRandomValues(bytes);
     return Buffer.from(bytes).toString('base64url').replace(/=+$/, '');
   }
 
   generateLoteId() {
     const bytes = new Uint8Array(12);
-    crypto.getRandomValues(bytes);
+    rng.getRandomValues(bytes);
     return 'l' + bs58.encode(bytes);
   }
 
