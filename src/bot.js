@@ -27,30 +27,31 @@ export class SolRanchBot {
     return this.state;
   }
 
-  getPlants() {
-    if (!this.state?.plantas) return [];
-    return Object.entries(this.state.plantas).map(([vaga, p]) => ({
-      vaga: Number(vaga),
-      ...p,
-    }));
+  // Vagas (slots) live in state.andares.plantas.vagas as {v1, v2, ...}.
+  // Each vaga has: id ("v1"), aberta, plantaId, acumulado, aguaAte, corvo, avisos.
+  getVagas() {
+    const vagas = this.state?.andares?.plantas?.vagas;
+    if (!vagas) return [];
+    return Object.values(vagas).filter(v => v.aberta && v.plantaId);
   }
 
-  // Touch plants to harvest suns and clear cows/pests off them.
+  // Touch plants to water, harvest suns, and scare crows off them.
   // Swipe in small random groups like a human dragging across the screen.
   async touchPlants() {
-    const plants = this.getPlants();
-    if (!plants.length) return;
+    const vagas = this.getVagas();
+    if (!vagas.length) return;
 
-    const ordered = shuffle(plants);
+    const crows = vagas.filter(v => v.corvo).length;
+    const ordered = shuffle(vagas);
     const swipeSize = randBetween(2, 5);
 
-    this.log('FARM', `Touching ${ordered.length} plants...`);
+    this.log('FARM', `Touching ${ordered.length} plants${crows ? ` (${crows} crows!)` : ''}...`);
 
     for (let i = 0; i < ordered.length; i += swipeSize) {
       const swipe = ordered.slice(i, i + swipeSize);
-      const actions = swipe.map(p => ({
+      const actions = swipe.map(v => ({
         name: 'tocarPlanta',
-        params: { vaga: p.vaga, arrasto: swipe.length > 1 },
+        params: { vaga: v.id, arrasto: swipe.length > 1 },
       }));
 
       const r = await this.api.sendActions(actions);
@@ -70,13 +71,8 @@ export class SolRanchBot {
     const jitter = randBetween(-15, 15) * 60 * 1000;
     if (Date.now() - this.lastHarvest < TWO_HOURS + jitter) return;
 
-    const plants = this.getPlants();
-    const now = this.api.now();
-    const readyCount = plants.filter(p => p.prontoEm && now >= p.prontoEm).length;
-    if (readyCount === 0) return;
-
     await humanDelay(800, 2000);
-    this.log('HARVEST', `Collecting suns (${readyCount} ready)...`);
+    this.log('HARVEST', 'Collecting suns...');
 
     const r = await this.api.sendAction('colherTudo');
     if (r?.ok) {
@@ -98,9 +94,10 @@ export class SolRanchBot {
   printStatus() {
     if (!this.state) return;
     const ls = Math.floor(this.state.ls || 0);
-    const plants = this.getPlants().length;
-    const nivel = this.state.jogador?.nivel || '?';
-    this.log('STATUS', `Lv${nivel} | Sun: ${ls} | Plants: ${plants}`);
+    const vagas = this.getVagas();
+    const crows = vagas.filter(v => v.corvo).length;
+    const nivel = this.state.nivel || '?';
+    this.log('STATUS', `Lv${nivel} | Sun: ${ls} | Plants: ${vagas.length}${crows ? ` | Crows: ${crows}` : ''}`);
   }
 
   async runCycle() {
